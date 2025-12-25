@@ -177,6 +177,57 @@ def evaluate(
     }
 
 
+def create_run_directory(config: DictConfig) -> tuple:
+    """
+    Create a unique, timestamped run directory.
+
+    Structure: results/YYYY-MM-DD/HHMMSS_agent_scenario_seed/
+
+    Returns:
+        Tuple of (run_dir, run_name)
+    """
+    from datetime import datetime
+
+    # Create timestamp
+    now = datetime.now()
+    date_str = now.strftime("%Y-%m-%d")
+    time_str = now.strftime("%H%M%S")
+
+    # Create descriptive run name
+    run_name = (
+        f"{config.agent.type}_{config.env.scenario.replace('-', '_')}_"
+        f"lr{config.agent.learning_rate}_seed{config.seed}"
+    )
+
+    # Full run directory with timestamp to prevent overwriting
+    run_dir = Path("results") / date_str / f"{time_str}_{run_name}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create subdirectories
+    (run_dir / "checkpoints").mkdir(exist_ok=True)
+    (run_dir / "plots").mkdir(exist_ok=True)
+
+    # Save full config for reproducibility
+    config_path = run_dir / "config.yaml"
+    with open(config_path, 'w') as f:
+        f.write(OmegaConf.to_yaml(config))
+
+    # Save run metadata
+    metadata = {
+        'start_time': now.isoformat(),
+        'run_name': run_name,
+        'agent_type': config.agent.type,
+        'scenario': config.env.scenario,
+        'seed': config.seed,
+        'num_episodes': config.training.num_episodes,
+    }
+    import json
+    with open(run_dir / "metadata.json", 'w') as f:
+        json.dump(metadata, f, indent=2)
+
+    return run_dir, run_name
+
+
 @hydra.main(version_base=None, config_path="../configs", config_name="default")
 def main(config: DictConfig) -> float:
     """
@@ -188,8 +239,13 @@ def main(config: DictConfig) -> float:
     Returns:
         Final average reward (for hyperparameter optimization)
     """
-    # Print configuration
+    # Create unique run directory (timestamped, never overwrites)
+    run_dir, run_name = create_run_directory(config)
     print("=" * 60)
+    print(f"Run directory: {run_dir}")
+    print("=" * 60)
+
+    # Print configuration
     print("Configuration:")
     print("=" * 60)
     print(OmegaConf.to_yaml(config))
@@ -225,12 +281,7 @@ def main(config: DictConfig) -> float:
     print(f"Agent: {agent}")
     print(f"Buffer capacity: {config.buffer.capacity}")
 
-    # Setup logging
-    run_name = (
-        f"{config.agent.type}_{config.env.scenario}_"
-        f"lr{config.agent.learning_rate}_seed{config.seed}"
-    )
-
+    # Setup logging - save to run directory
     wandb_logger = WandbLogger(
         project=config.logging.wandb_project,
         config=OmegaConf.to_container(config, resolve=True),
@@ -240,17 +291,13 @@ def main(config: DictConfig) -> float:
 
     csv_logger = None
     if config.logging.csv_log:
-        os.makedirs("results", exist_ok=True)
         csv_logger = CSVLogger(
-            filepath=f"results/{run_name}.csv",
+            filepath=str(run_dir / "training_log.csv"),
             fieldnames=[
                 'episode', 'reward', 'length', 'loss',
                 'epsilon', 'buffer_size', 'time_hours'
             ]
         )
-
-    # Create checkpoint directory
-    os.makedirs("checkpoints", exist_ok=True)
 
     # Training loop
     episode_rewards = []
@@ -321,15 +368,15 @@ def main(config: DictConfig) -> float:
             # Save best model
             if eval_metrics['eval_reward_mean'] > best_eval_reward:
                 best_eval_reward = eval_metrics['eval_reward_mean']
-                agent.save(f"checkpoints/{run_name}_best.pt")
+                agent.save(str(run_dir / "checkpoints" / "best.pt"))
                 print(f"  [BEST] New best model saved!")
 
         # Periodic checkpoint
         if episode % config.training.save_freq == 0 and episode > 0:
-            agent.save(f"checkpoints/{run_name}_ep{episode}.pt")
+            agent.save(str(run_dir / "checkpoints" / f"ep{episode}.pt"))
 
     # Final save
-    agent.save(f"checkpoints/{run_name}_final.pt")
+    agent.save(str(run_dir / "checkpoints" / "final.pt"))
 
     # Training complete
     total_time = time.time() - start_time
@@ -340,20 +387,36 @@ def main(config: DictConfig) -> float:
     print(f"Total time: {total_time / 3600:.2f} hours")
     print(f"Final avg reward (last 100): {final_avg_reward:.2f}")
     print(f"Best eval reward: {best_eval_reward:.2f}")
+    print(f"Results saved to: {run_dir}")
 
     # Plot learning curve
-    os.makedirs("results", exist_ok=True)
     plot_learning_curve(
         episode_rewards,
         window=100,
         title=f"{config.agent.type} on {config.env.scenario}",
-        save_path=f"results/{run_name}_curve.png"
+        save_path=str(run_dir / "plots" / "learning_curve.png")
     )
+
+    # Save final summary
+    import json
+    summary = {
+        'run_name': run_name,
+        'run_dir': str(run_dir),
+        'total_time_hours': total_time / 3600,
+        'num_episodes': config.training.num_episodes,
+        'final_avg_reward_100': final_avg_reward,
+        'best_eval_reward': best_eval_reward,
+        'final_epsilon': agent.epsilon,
+        'final_buffer_size': len(buffer),
+    }
+    with open(run_dir / "summary.json", 'w') as f:
+        json.dump(summary, f, indent=2)
 
     # Cleanup
     wandb_logger.finish()
     env.close()
 
+    print(f"\nAll outputs saved to: {run_dir}")
     return final_avg_reward
 
 

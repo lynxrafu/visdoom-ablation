@@ -163,25 +163,60 @@ class CSVResultLoader:
         try:
             df = pd.read_csv(path)
 
-            # Parse filename: algorithm_scenario_lrX_seedY.csv
-            filename = path.stem
-            parts = filename.split('_')
+            # Try to load metadata from parent directory first (new format)
+            metadata_path = path.parent / "metadata.json"
+            config_path = path.parent / "config.yaml"
 
-            algorithm = parts[0] if len(parts) > 0 else "unknown"
-            scenario = parts[1] if len(parts) > 1 else "unknown"
-
-            # Extract seed from filename
+            algorithm = "unknown"
+            scenario = "unknown"
             seed = 1
-            for part in parts:
-                if part.startswith('seed'):
-                    seed = int(part.replace('seed', ''))
-                    break
+            config = {}
+
+            if metadata_path.exists():
+                # New format: read from metadata.json
+                with open(metadata_path) as f:
+                    metadata = json.load(f)
+                algorithm = metadata.get('agent_type', 'unknown')
+                scenario = metadata.get('scenario', 'unknown')
+                seed = metadata.get('seed', 1)
+            else:
+                # Old format: parse from directory name or filename
+                # Directory format: HHMMSS_agent_scenario_lrX_seedY
+                dir_name = path.parent.name
+                parts = dir_name.split('_')
+
+                if len(parts) >= 3:
+                    # Skip timestamp if present (6 digits)
+                    start_idx = 1 if parts[0].isdigit() and len(parts[0]) == 6 else 0
+                    algorithm = parts[start_idx] if len(parts) > start_idx else "unknown"
+
+                    # Find scenario (contains 'Vizdoom' or 'v0')
+                    for i, part in enumerate(parts[start_idx:], start_idx):
+                        if 'vizdoom' in part.lower() or 'v0' in part.lower():
+                            # Reconstruct scenario name
+                            scenario = part.replace('_', '-')
+                            break
+
+                    # Extract seed
+                    for part in parts:
+                        if part.startswith('seed'):
+                            seed = int(part.replace('seed', ''))
+                            break
+
+            # Load config if available
+            if config_path.exists():
+                try:
+                    import yaml
+                    with open(config_path) as f:
+                        config = yaml.safe_load(f)
+                except:
+                    pass
 
             return ExperimentResult(
                 algorithm=algorithm,
                 scenario=scenario,
                 seed=seed,
-                config={},
+                config=config,
                 episodes=df['episode'].tolist() if 'episode' in df else list(range(len(df))),
                 rewards=df['reward'].tolist() if 'reward' in df else [],
                 losses=df['loss'].tolist() if 'loss' in df else [],
@@ -532,14 +567,18 @@ class ResultsAnalyzer:
         self.comparisons: Dict[str, ComparisonResult] = {}
 
     def load_all(self) -> int:
-        """Load all CSV results from the results directory."""
+        """Load all CSV results from the results directory (recursively)."""
         self.raw_results = []
 
         if not self.results_dir.exists():
             print(f"Results directory not found: {self.results_dir}")
             return 0
 
-        csv_files = list(self.results_dir.glob("*.csv"))
+        # Recursively find all training_log.csv and *.csv files
+        csv_files = list(self.results_dir.glob("**/training_log.csv"))
+        csv_files.extend(list(self.results_dir.glob("**/*.csv")))
+        # Remove duplicates and filter out non-training files
+        csv_files = list(set(f for f in csv_files if 'summary' not in f.name))
 
         for csv_file in csv_files:
             result = self.loader.load(csv_file)
