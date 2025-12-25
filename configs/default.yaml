@@ -86,7 +86,7 @@ training:
 
   # Minimum buffer size before training starts
   # Should be >= batch_size
-  min_buffer_size: 10000
+  min_buffer_size: 1000
 
   # Steps between gradient updates
   # 4 is standard for Atari
