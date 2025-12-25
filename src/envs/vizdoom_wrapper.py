@@ -132,21 +132,38 @@ class PreprocessWrapper(gym.ObservationWrapper):
             dtype=np.float32
         )
 
-    def observation(self, obs: np.ndarray) -> np.ndarray:
+    def observation(self, obs) -> np.ndarray:
         """
         Process a single observation frame.
 
         Handles various input formats from ViZDoom:
+        - dict: {'screen': array, ...} - extract 'screen' key
         - (H, W, C): Standard HWC format
         - (C, H, W): Channel-first format
         - (H, W): Already grayscale
 
         Args:
-            obs: Raw observation from environment
+            obs: Raw observation from environment (dict or array)
 
         Returns:
             Preprocessed observation (H, W) normalized to [0, 1]
         """
+        # Handle dictionary observations (ViZDoom gymnasium wrapper format)
+        if isinstance(obs, dict):
+            if 'screen' in obs:
+                obs = obs['screen']
+            elif 'rgb' in obs:
+                obs = obs['rgb']
+            else:
+                # Use first array value found
+                for v in obs.values():
+                    if isinstance(v, np.ndarray):
+                        obs = v
+                        break
+
+        # Ensure numpy array
+        obs = np.asarray(obs)
+
         # Handle channel-first format (C, H, W)
         if len(obs.shape) == 3:
             if obs.shape[0] in [1, 3, 4]:  # Likely CHW
