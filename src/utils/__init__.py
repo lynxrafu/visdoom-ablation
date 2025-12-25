@@ -6,12 +6,21 @@ Includes:
 - Logging (WandB and CSV)
 - Plotting (learning curves, comparisons)
 - Factory functions (agent and buffer builders)
+- Analysis (results comparison and reporting)
 """
 
 from .replay_buffer import ReplayBuffer, PrioritizedReplayBuffer, SumTree
 from .logging import WandbLogger, CSVLogger
 from .plotting import plot_learning_curve, plot_comparison, plot_ablation_heatmap
 from .factory import build_agent, build_buffer
+from .analysis import (
+    ResultsAnalyzer,
+    ExperimentResult,
+    AggregatedResult,
+    ComparisonResult,
+    ResultPlotter,
+    analyze_results,
+)
 
 __all__ = [
     # Replay buffers
@@ -28,4 +37,11 @@ __all__ = [
     # Factory
     "build_agent",
     "build_buffer",
+    # Analysis
+    "ResultsAnalyzer",
+    "ExperimentResult",
+    "AggregatedResult",
+    "ComparisonResult",
+    "ResultPlotter",
+    "analyze_results",
 ]
