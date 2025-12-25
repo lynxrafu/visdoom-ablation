@@ -1,0 +1,8 @@
+# Deep SARSA configuration
+# On-policy TD learning (uses actual next action, not max)
+
+defaults:
+  - default
+
+agent:
+  type: "deep_sarsa"

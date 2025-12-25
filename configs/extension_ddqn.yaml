@@ -1,0 +1,8 @@
+# Double DQN configuration
+# Reduces overestimation bias by decoupling action selection/evaluation
+
+defaults:
+  - default
+
+agent:
+  type: "ddqn"

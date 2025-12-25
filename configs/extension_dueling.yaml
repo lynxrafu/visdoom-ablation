@@ -1,0 +1,10 @@
+# Dueling DQN configuration
+# Separate value and advantage streams for better state value estimation
+# Combines with Double DQN for best performance
+
+defaults:
+  - default
+
+agent:
+  type: "dueling"
+  double_dqn: true  # Recommended: combine Dueling with DDQN

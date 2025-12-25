@@ -1,0 +1,18 @@
+# Configuration for VizdoomDeathmatch-v0 scenario
+# Combat task - kill enemies, survive
+# Difficulty: Hard | Actions: 6+ | Max steps: 4200
+
+defaults:
+  - default
+
+env:
+  scenario: "VizdoomDeathmatch-v0"
+
+training:
+  num_episodes: 3000
+  max_steps_per_episode: 4200
+  eval_freq: 100
+
+# Harder scenario may benefit from lower learning rate
+agent:
+  learning_rate: 0.00005

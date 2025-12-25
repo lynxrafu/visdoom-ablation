@@ -1,0 +1,14 @@
+# Configuration for VizdoomBasic-v0 scenario
+# Basic shooting task - kill monster in single room
+# Difficulty: Easy | Actions: 3 | Max steps: 300
+
+defaults:
+  - default
+
+env:
+  scenario: "VizdoomBasic-v0"
+
+training:
+  num_episodes: 1000
+  max_steps_per_episode: 300
+  eval_freq: 50

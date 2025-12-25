@@ -1,0 +1,14 @@
+# Configuration for VizdoomTakeCover-v0 scenario
+# Survival task - dodge fireballs
+# Difficulty: Medium | Actions: 2 | Max steps: 2100
+
+defaults:
+  - default
+
+env:
+  scenario: "VizdoomTakeCover-v0"
+
+training:
+  num_episodes: 2000
+  max_steps_per_episode: 2100
+  eval_freq: 100

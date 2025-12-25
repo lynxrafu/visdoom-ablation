@@ -1,0 +1,12 @@
+# Learning rate ablation configuration
+# Tests: 0.0001 (stable), 0.001 (balanced), 0.01 (fast but unstable)
+
+defaults:
+  - default
+
+# Hydra sweeper for learning rate grid search
+hydra:
+  sweeper:
+    params:
+      agent.learning_rate: 0.0001, 0.001, 0.01
+      seed: 1, 2, 3

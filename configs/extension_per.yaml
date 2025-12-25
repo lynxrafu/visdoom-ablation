@@ -1,0 +1,11 @@
+# Prioritized Experience Replay (PER) configuration
+# Samples transitions proportional to TD error for more efficient learning
+
+defaults:
+  - default
+
+buffer:
+  prioritized: true
+  per_alpha: 0.6           # Priority exponent
+  per_beta_start: 0.4      # Initial importance sampling exponent
+  per_beta_frames: 100000  # Frames to anneal beta to 1.0

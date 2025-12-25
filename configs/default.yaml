@@ -1,0 +1,140 @@
+# Default configuration for ViZDoom Deep RL Ablation Study
+# This file defines the complete parameter schema and default values.
+# All other configs inherit from this using Hydra's defaults system.
+
+# =============================================================================
+# Environment Settings
+# =============================================================================
+env:
+  # ViZDoom scenario (see src/envs/vizdoom_wrapper.py for available scenarios)
+  scenario: "VizdoomBasic-v0"
+
+  # Frame skipping (action repeat)
+  # Higher values = faster training but less control granularity
+  frame_skip: 4
+
+  # Number of frames to stack (temporal information)
+  # Standard for Atari/ViZDoom is 4
+  frame_stack: 4
+
+  # Image size (square)
+  # Standard is 84x84 following Mnih et al. 2015
+  image_size: 84
+
+  # Whether to clip rewards to [-1, 1]
+  clip_rewards: false
+
+# =============================================================================
+# Agent Settings
+# =============================================================================
+agent:
+  # Agent type: dqn, deep_sarsa, ddqn, dueling, dueling_ddqn
+  type: "dqn"
+
+  # Learning rate for Adam optimizer
+  # Recommended: 0.0001 for stable training, 0.001 for faster but less stable
+  learning_rate: 0.0001
+
+  # Discount factor (gamma)
+  # Higher values = more weight on future rewards
+  gamma: 0.99
+
+  # Exploration schedule
+  epsilon_start: 1.0    # Initial exploration rate
+  epsilon_end: 0.01     # Minimum exploration rate
+  epsilon_decay: 0.995  # Multiplicative decay per episode
+
+  # Target network update frequency (in gradient steps)
+  target_update_freq: 1000
+
+  # N-step returns
+  # 1 = standard TD(0)
+  # 3+ = more Monte Carlo-like (better credit assignment but higher variance)
+  n_step: 1
+
+  # For Dueling architecture: whether to also use DDQN target
+  double_dqn: false
+
+# =============================================================================
+# Replay Buffer Settings
+# =============================================================================
+buffer:
+  # Maximum buffer capacity
+  # Larger = more sample diversity but more memory
+  capacity: 100000
+
+  # Whether to use Prioritized Experience Replay (PER)
+  prioritized: false
+
+  # PER parameters (only used if prioritized=true)
+  per_alpha: 0.6           # Priority exponent (0=uniform, 1=full prioritization)
+  per_beta_start: 0.4      # Initial importance sampling exponent
+  per_beta_frames: 100000  # Frames to anneal beta to 1.0
+
+# =============================================================================
+# Training Settings
+# =============================================================================
+training:
+  # Total number of training episodes
+  num_episodes: 2000
+
+  # Maximum steps per episode (prevents infinite episodes)
+  max_steps_per_episode: 1000
+
+  # Minibatch size for gradient updates
+  batch_size: 32
+
+  # Minimum buffer size before training starts
+  # Should be >= batch_size
+  min_buffer_size: 10000
+
+  # Steps between gradient updates
+  # 4 is standard for Atari
+  update_freq: 4
+
+  # Episodes between evaluations
+  eval_freq: 100
+
+  # Number of episodes per evaluation
+  eval_episodes: 10
+
+  # Episodes between model checkpoints
+  save_freq: 500
+
+# =============================================================================
+# Logging Settings
+# =============================================================================
+logging:
+  # Enable Weights & Biases logging
+  wandb_enabled: true
+
+  # WandB project name
+  wandb_project: "vizdoom-ablation"
+
+  # Enable CSV logging (for IEEE report)
+  csv_log: true
+
+  # Episodes between log entries
+  log_freq: 10
+
+# =============================================================================
+# Hardware Settings
+# =============================================================================
+# Device for PyTorch: 'auto', 'cuda', or 'cpu'
+device: "auto"
+
+# Random seed for reproducibility
+seed: 42
+
+# =============================================================================
+# Hydra Settings
+# =============================================================================
+hydra:
+  run:
+    # Output directory for single runs
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+  sweep:
+    # Output directory for multirun sweeps
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
