@@ -16,6 +16,18 @@ import cv2
 from typing import Tuple, Optional, Dict, Any, List
 from collections import deque
 
+# Register ViZDoom gymnasium environments
+# This import registers all ViZDoom envs with gymnasium
+try:
+    import vizdoom.gymnasium_wrapper  # noqa: F401
+except ImportError:
+    # Fallback for older vizdoom versions
+    try:
+        from vizdoom import gymnasium_wrapper  # noqa: F401
+    except ImportError:
+        print("Warning: Could not import vizdoom.gymnasium_wrapper. "
+              "ViZDoom environments may not be registered.")
+
 
 # Available ViZDoom scenarios with their characteristics
 VIZDOOM_SCENARIOS = {
