@@ -13,8 +13,12 @@ Factory function:
 import gymnasium as gym
 import numpy as np
 import cv2
+import warnings
 from typing import Tuple, Optional, Dict, Any, List
 from collections import deque
+
+# Suppress ViZDoom screen format warning (it auto-converts to RGB24)
+warnings.filterwarnings("ignore", message="Detected screen format")
 
 # Register ViZDoom gymnasium environments
 # This import registers all ViZDoom envs with gymnasium
@@ -407,8 +411,12 @@ def make_vizdoom_env(
             f"Available: {available}"
         )
 
-    # Create base environment
-    env = gym.make(scenario, render_mode=render_mode)
+    # Create base environment with proper screen format
+    # Set frame_skip=1 here (we handle it in SkipFrameWrapper)
+    import warnings
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Detected screen format")
+        env = gym.make(scenario, render_mode=render_mode, frame_skip=1)
 
     # Apply wrappers in order
     if frame_skip > 1:
