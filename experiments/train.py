@@ -184,7 +184,10 @@ def create_run_directory(config: DictConfig) -> tuple:
     Structure: results/YYYY-MM-DD/HHMMSS_agent_scenario_seed/
 
     Returns:
-        Tuple of (run_dir, run_name)
+        Tuple of (run_dir, run_name, run_id)
+        - run_dir: Path to the run directory
+        - run_name: Descriptive name (agent_scenario_lr_seed)
+        - run_id: Unique ID with timestamp (for WandB)
     """
     from datetime import datetime
 
@@ -193,11 +196,14 @@ def create_run_directory(config: DictConfig) -> tuple:
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H%M%S")
 
-    # Create descriptive run name
+    # Create descriptive run name (without timestamp for readability)
     run_name = (
         f"{config.agent.type}_{config.env.scenario.replace('-', '_')}_"
         f"lr{config.agent.learning_rate}_seed{config.seed}"
     )
+
+    # Unique run ID with timestamp (for WandB and directory)
+    run_id = f"{date_str}_{time_str}_{run_name}"
 
     # Full run directory with timestamp to prevent overwriting
     run_dir = Path("results") / date_str / f"{time_str}_{run_name}"
@@ -215,17 +221,22 @@ def create_run_directory(config: DictConfig) -> tuple:
     # Save run metadata
     metadata = {
         'start_time': now.isoformat(),
+        'run_id': run_id,
         'run_name': run_name,
         'agent_type': config.agent.type,
         'scenario': config.env.scenario,
         'seed': config.seed,
         'num_episodes': config.training.num_episodes,
+        'learning_rate': config.agent.learning_rate,
+        'gamma': config.agent.gamma,
+        'n_step': config.agent.n_step,
+        'buffer_prioritized': config.buffer.prioritized,
     }
     import json
     with open(run_dir / "metadata.json", 'w') as f:
         json.dump(metadata, f, indent=2)
 
-    return run_dir, run_name
+    return run_dir, run_name, run_id
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="default")
@@ -240,8 +251,9 @@ def main(config: DictConfig) -> float:
         Final average reward (for hyperparameter optimization)
     """
     # Create unique run directory (timestamped, never overwrites)
-    run_dir, run_name = create_run_directory(config)
+    run_dir, run_name, run_id = create_run_directory(config)
     print("=" * 60)
+    print(f"Run ID: {run_id}")
     print(f"Run directory: {run_dir}")
     print("=" * 60)
 
@@ -282,10 +294,11 @@ def main(config: DictConfig) -> float:
     print(f"Buffer capacity: {config.buffer.capacity}")
 
     # Setup logging - save to run directory
+    # Use run_id for WandB to ensure unique names across runs
     wandb_logger = WandbLogger(
         project=config.logging.wandb_project,
         config=OmegaConf.to_container(config, resolve=True),
-        run_name=run_name,
+        run_name=run_id,  # Unique timestamped name
         enabled=config.logging.wandb_enabled
     )
 
