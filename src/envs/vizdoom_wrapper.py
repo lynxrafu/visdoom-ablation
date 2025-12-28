@@ -85,7 +85,7 @@ VIZDOOM_SCENARIOS = {
     },
     'VizdoomDeathmatch-v0': {
         'description': 'Combat task - kill enemies, survive',
-        'actions': 15,  # Discretized from Dict space (see DictActionWrapper)
+        'actions': 18,  # ViZDoom's built-in Discrete(18) binary actions
         'max_steps': 4200,
         'difficulty': 'hard'
     },
@@ -100,118 +100,60 @@ VIZDOOM_SCENARIOS = {
 
 class DictActionWrapper(gym.ActionWrapper):
     """
-    Convert Dict/MultiDiscrete action space to Discrete.
+    Convert Dict action space (with binary + continuous) to Discrete.
 
-    Some ViZDoom scenarios (like Deathmatch) have complex action spaces
-    with multiple action dimensions. This wrapper flattens them into
-    a single Discrete space by enumerating all valid action combinations.
+    ViZDoom Deathmatch has a Dict action space with:
+    - 'binary': Discrete(18) - pre-combined button actions
+    - 'continuous': Box(3,) - delta values for mouse look
 
-    For example, if the action space has:
-    - binary[0]: ATTACK (0 or 1)
-    - binary[1]: MOVE_FORWARD (0 or 1)
-    - binary[2]: TURN_LEFT (0 or 1)
-    - binary[3]: TURN_RIGHT (0 or 1)
-
-    We create discrete actions for useful combinations like:
-    - 0: No action
-    - 1: Attack
-    - 2: Move forward
-    - 3: Move forward + Attack
-    - 4: Turn left
-    - 5: Turn right
-    - etc.
+    This wrapper maps our discrete actions to the binary component
+    and sets continuous to zeros (no mouse movement).
 
     Args:
         env: Gymnasium environment with Dict action space
     """
 
-    # Predefined action combinations for Deathmatch-like scenarios
-    # Each tuple represents: (ATTACK, MOVE_FORWARD, MOVE_BACKWARD, TURN_LEFT, TURN_RIGHT, ...)
-    DEATHMATCH_ACTIONS = [
-        # Basic movement
-        [0, 0, 0, 0, 0, 0, 0],  # 0: No action
-        [1, 0, 0, 0, 0, 0, 0],  # 1: Attack
-        [0, 1, 0, 0, 0, 0, 0],  # 2: Move forward
-        [0, 0, 1, 0, 0, 0, 0],  # 3: Move backward
-        [0, 0, 0, 1, 0, 0, 0],  # 4: Turn left
-        [0, 0, 0, 0, 1, 0, 0],  # 5: Turn right
-        # Attack + movement
-        [1, 1, 0, 0, 0, 0, 0],  # 6: Attack + Move forward
-        [1, 0, 0, 1, 0, 0, 0],  # 7: Attack + Turn left
-        [1, 0, 0, 0, 1, 0, 0],  # 8: Attack + Turn right
-        # Strafe
-        [0, 0, 0, 0, 0, 1, 0],  # 9: Move left (strafe)
-        [0, 0, 0, 0, 0, 0, 1],  # 10: Move right (strafe)
-        # Combined
-        [0, 1, 0, 1, 0, 0, 0],  # 11: Move forward + Turn left
-        [0, 1, 0, 0, 1, 0, 0],  # 12: Move forward + Turn right
-        [1, 1, 0, 1, 0, 0, 0],  # 13: Attack + Move forward + Turn left
-        [1, 1, 0, 0, 1, 0, 0],  # 14: Attack + Move forward + Turn right
-    ]
-
     def __init__(self, env: gym.Env) -> None:
         super().__init__(env)
 
         self.original_action_space = env.action_space
-        self._setup_action_mapping()
 
-        # Create new Discrete action space
-        self.action_space = gym.spaces.Discrete(len(self.action_list))
-
-        # Debug: print action space info
-        print(f"[DictActionWrapper] Original space: {type(self.original_action_space)}")
+        # Check if this is a ViZDoom Dict space with binary/continuous
         if isinstance(self.original_action_space, gym.spaces.Dict):
-            print(f"[DictActionWrapper] Keys: {self.action_keys}")
-            for key in self.action_keys:
-                print(f"  {key}: {self.original_action_space[key]}")
-        print(f"[DictActionWrapper] New Discrete space: {self.action_space.n} actions")
-
-    def _setup_action_mapping(self):
-        """Setup action mapping based on original action space type."""
-        if isinstance(self.original_action_space, gym.spaces.Dict):
-            # Dict action space - get the binary actions
             self.action_keys = list(self.original_action_space.spaces.keys())
-            self.num_binary = len(self.action_keys)
 
-            # Use predefined actions, trimmed to match action space size
-            self.action_list = []
-            for action in self.DEATHMATCH_ACTIONS:
-                if len(action) >= self.num_binary:
-                    self.action_list.append(action[:self.num_binary])
-                else:
-                    # Pad with zeros if needed
-                    padded = action + [0] * (self.num_binary - len(action))
-                    self.action_list.append(padded)
+            # ViZDoom uses 'binary' for discrete button combos
+            if 'binary' in self.action_keys:
+                binary_space = self.original_action_space['binary']
+                self.num_actions = binary_space.n  # Use ViZDoom's built-in discretization
+                self.has_continuous = 'continuous' in self.action_keys
 
-        elif isinstance(self.original_action_space, gym.spaces.MultiDiscrete):
-            # MultiDiscrete action space
-            self.num_binary = len(self.original_action_space.nvec)
-            self.action_keys = None
-
-            self.action_list = []
-            for action in self.DEATHMATCH_ACTIONS:
-                if len(action) >= self.num_binary:
-                    self.action_list.append(action[:self.num_binary])
-                else:
-                    padded = action + [0] * (self.num_binary - len(action))
-                    self.action_list.append(padded)
+                if self.has_continuous:
+                    cont_space = self.original_action_space['continuous']
+                    self.continuous_shape = cont_space.shape
+                    self.continuous_dtype = cont_space.dtype
+            else:
+                raise ValueError(f"Expected 'binary' key in Dict space, got: {self.action_keys}")
         else:
-            raise ValueError(f"Unsupported action space: {type(self.original_action_space)}")
+            raise ValueError(f"Expected Dict action space, got: {type(self.original_action_space)}")
+
+        # Create new Discrete action space matching ViZDoom's binary actions
+        self.action_space = gym.spaces.Discrete(self.num_actions)
+
+        print(f"[DictActionWrapper] Original: Dict with binary=Discrete({self.num_actions}), continuous={self.has_continuous}")
+        print(f"[DictActionWrapper] New: Discrete({self.num_actions})")
 
     def action(self, action: int):
-        """Convert discrete action to original action space format."""
-        action_values = self.action_list[action]
+        """Convert discrete action to Dict format for ViZDoom."""
+        result = {
+            'binary': int(action),  # ViZDoom expects an int for Discrete
+        }
 
-        if isinstance(self.original_action_space, gym.spaces.Dict):
-            # ViZDoom Dict action space requires dict with matching keys
-            # Each key maps to a numpy array with the button value
-            return {
-                key: np.array(action_values[i], dtype=self.original_action_space[key].dtype)
-                for i, key in enumerate(self.action_keys)
-            }
-        else:
-            # MultiDiscrete expects numpy array
-            return np.array(action_values, dtype=np.int64)
+        if self.has_continuous:
+            # Set continuous to zeros (no mouse movement)
+            result['continuous'] = np.zeros(self.continuous_shape, dtype=self.continuous_dtype)
+
+        return result
 
 
 class PreprocessWrapper(gym.ObservationWrapper):
