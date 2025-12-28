@@ -255,7 +255,8 @@ def save_training_state(
     best_eval_reward: float,
     start_time: float,
     buffer,
-    agent
+    agent,
+    save_buffer: bool = False
 ) -> None:
     """
     Save complete training state for resume functionality.
@@ -263,7 +264,7 @@ def save_training_state(
     Saves:
     - Training progress (episode number, rewards history)
     - Agent checkpoint (network weights, optimizer, epsilon)
-    - Buffer state (all transitions)
+    - Buffer state (all transitions) - optional, controlled by save_buffer
 
     Args:
         run_dir: Run directory path
@@ -273,6 +274,7 @@ def save_training_state(
         start_time: Training start time
         buffer: Replay buffer
         agent: RL agent
+        save_buffer: Whether to save buffer state (slow but enables exact reproducibility)
     """
     import json
 
@@ -293,8 +295,9 @@ def save_training_state(
     # Save agent (overwrites previous)
     agent.save(str(checkpoint_dir / "latest.pt"))
 
-    # Save buffer state (for exact reproducibility)
-    buffer.save_state(str(checkpoint_dir / "buffer_state.gz"))
+    # Save buffer state (for exact reproducibility) - optional
+    if save_buffer:
+        buffer.save_state(str(checkpoint_dir / "buffer_state.gz"))
 
 
 def load_training_state(
@@ -683,11 +686,15 @@ def main(config: DictConfig) -> float:
         if episode % config.training.save_freq == 0 and episode > 0:
             agent.save(str(run_dir / "checkpoints" / f"ep{episode}.pt"))
             # Save complete training state for resume functionality
+            save_buffer = config.training.get('save_buffer', False)
             save_training_state(
                 run_dir, episode, episode_rewards, best_eval_reward,
-                start_time - previous_elapsed, buffer, agent
+                start_time - previous_elapsed, buffer, agent, save_buffer=save_buffer
             )
-            logger.info(f"  Checkpoint saved: ep{episode}.pt (with resume state)")
+            if save_buffer:
+                logger.info(f"  Checkpoint saved: ep{episode}.pt (with full resume state including buffer)")
+            else:
+                logger.info(f"  Checkpoint saved: ep{episode}.pt (fast checkpoint, buffer not saved)")
             # Force flush CSV after checkpoint save (Colab safety)
             if csv_logger:
                 csv_logger.flush()

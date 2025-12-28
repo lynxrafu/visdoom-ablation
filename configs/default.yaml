@@ -105,7 +105,13 @@ training:
 
   # Episodes between model checkpoints
   # Lower value = safer on Colab (less progress lost on timeout)
-  save_freq: 500
+  save_freq: 100
+
+  # Whether to save replay buffer state in checkpoints
+  # false = fast checkpoints (only agent + training state, ~few MB)
+  # true = full resume capability (agent + training state + buffer, ~1-3 GB)
+  # Buffer saving is slow but enables exact reproducibility on resume
+  save_buffer: false
 
 # =============================================================================
 # Logging Settings
