@@ -104,7 +104,8 @@ training:
   eval_episodes: 10
 
   # Episodes between model checkpoints
-  save_freq: 500
+  # Lower value = safer on Colab (less progress lost on timeout)
+  save_freq: 100
 
 # =============================================================================
 # Logging Settings

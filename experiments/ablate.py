@@ -152,7 +152,8 @@ def run_with_resume(
     seed: int,
     num_episodes: int,
     extra_args: List[str],
-    dry_run: bool = False
+    dry_run: bool = False,
+    wandb_enabled: bool = True
 ) -> int:
     """
     Run experiment with automatic resume detection.
@@ -164,6 +165,7 @@ def run_with_resume(
         num_episodes: Training episodes
         extra_args: Additional args for train.py
         dry_run: If True, just print commands
+        wandb_enabled: Whether to enable WandB logging
 
     Returns:
         Return code
@@ -176,11 +178,13 @@ def run_with_resume(
         return 0
 
     # Build base args
+    wandb_arg = 'true' if wandb_enabled else 'false'
     args = [
         f'agent.type={agent_type}',
         f'env.scenario={scenario}',
         f'seed={seed}',
         f'training.num_episodes={num_episodes}',
+        f'logging.wandb_enabled={wandb_arg}',
     ] + extra_args
 
     if status == "incomplete":
@@ -194,7 +198,8 @@ def run_algorithm_comparison(
     scenarios: List[str],
     seeds: List[int],
     num_episodes: int = 1000,
-    dry_run: bool = False
+    dry_run: bool = False,
+    wandb_enabled: bool = True
 ) -> None:
     """
     Phase 1: Compare DQN vs Deep SARSA.
@@ -204,6 +209,7 @@ def run_algorithm_comparison(
         seeds: Random seeds for multiple runs
         num_episodes: Training episodes per run
         dry_run: If True, just print commands
+        wandb_enabled: Whether to enable WandB logging
     """
     print("\n" + "=" * 60)
     print("PHASE 1: Algorithm Comparison (DQN vs Deep SARSA)")
@@ -217,8 +223,9 @@ def run_algorithm_comparison(
             scenario=scenario,
             seed=seed,
             num_episodes=num_episodes,
-            extra_args=['logging.wandb_enabled=true'],
-            dry_run=dry_run
+            extra_args=[],
+            dry_run=dry_run,
+            wandb_enabled=wandb_enabled
         )
 
 
@@ -226,7 +233,8 @@ def run_lr_ablation(
     scenarios: List[str],
     seeds: List[int],
     num_episodes: int = 1000,
-    dry_run: bool = False
+    dry_run: bool = False,
+    wandb_enabled: bool = True
 ) -> None:
     """
     Phase 2a: Learning rate ablation.
@@ -243,8 +251,9 @@ def run_lr_ablation(
             scenario=scenario,
             seed=seed,
             num_episodes=num_episodes,
-            extra_args=[f'agent.learning_rate={lr}', 'logging.wandb_enabled=true'],
-            dry_run=dry_run
+            extra_args=[f'agent.learning_rate={lr}'],
+            dry_run=dry_run,
+            wandb_enabled=wandb_enabled
         )
 
 
@@ -252,7 +261,8 @@ def run_gamma_ablation(
     scenarios: List[str],
     seeds: List[int],
     num_episodes: int = 1000,
-    dry_run: bool = False
+    dry_run: bool = False,
+    wandb_enabled: bool = True
 ) -> None:
     """
     Phase 2b: Discount factor ablation.
@@ -269,8 +279,9 @@ def run_gamma_ablation(
             scenario=scenario,
             seed=seed,
             num_episodes=num_episodes,
-            extra_args=[f'agent.gamma={gamma}', 'logging.wandb_enabled=true'],
-            dry_run=dry_run
+            extra_args=[f'agent.gamma={gamma}'],
+            dry_run=dry_run,
+            wandb_enabled=wandb_enabled
         )
 
 
@@ -278,7 +289,8 @@ def run_nstep_ablation(
     scenarios: List[str],
     seeds: List[int],
     num_episodes: int = 1000,
-    dry_run: bool = False
+    dry_run: bool = False,
+    wandb_enabled: bool = True
 ) -> None:
     """
     Phase 2c: N-step returns ablation (TD vs MC-like).
@@ -295,8 +307,9 @@ def run_nstep_ablation(
             scenario=scenario,
             seed=seed,
             num_episodes=num_episodes,
-            extra_args=[f'agent.n_step={n}', 'logging.wandb_enabled=true'],
-            dry_run=dry_run
+            extra_args=[f'agent.n_step={n}'],
+            dry_run=dry_run,
+            wandb_enabled=wandb_enabled
         )
 
 
@@ -304,7 +317,8 @@ def run_extension_ablation(
     scenarios: List[str],
     seeds: List[int],
     num_episodes: int = 1000,
-    dry_run: bool = False
+    dry_run: bool = False,
+    wandb_enabled: bool = True
 ) -> None:
     """
     Phase 3: Extension ablation (DDQN, Dueling, PER).
@@ -328,7 +342,6 @@ def run_extension_ablation(
 
         extra_args = [
             f'buffer.prioritized={str(per).lower()}',
-            'logging.wandb_enabled=true'
         ]
 
         # For dueling, also enable double_dqn
@@ -341,7 +354,8 @@ def run_extension_ablation(
             seed=seed,
             num_episodes=num_episodes,
             extra_args=extra_args,
-            dry_run=dry_run
+            dry_run=dry_run,
+            wandb_enabled=wandb_enabled
         )
 
 
@@ -460,6 +474,12 @@ Example:
         help='Only aggregate existing results, skip training'
     )
 
+    parser.add_argument(
+        '--no-wandb',
+        action='store_true',
+        help='Disable WandB logging (use CSV only)'
+    )
+
     args = parser.parse_args()
 
     # Print configuration
@@ -477,30 +497,33 @@ Example:
         aggregate_results()
         return
 
+    # Determine if WandB is enabled
+    wandb_enabled = not args.no_wandb
+
     # Run selected phase
     if args.phase == 'algorithms' or args.phase == 'all':
         run_algorithm_comparison(
-            args.scenarios, args.seeds, args.episodes, args.dry_run
+            args.scenarios, args.seeds, args.episodes, args.dry_run, wandb_enabled
         )
 
     if args.phase == 'lr' or args.phase == 'all':
         run_lr_ablation(
-            args.scenarios, args.seeds, args.episodes, args.dry_run
+            args.scenarios, args.seeds, args.episodes, args.dry_run, wandb_enabled
         )
 
     if args.phase == 'gamma' or args.phase == 'all':
         run_gamma_ablation(
-            args.scenarios, args.seeds, args.episodes, args.dry_run
+            args.scenarios, args.seeds, args.episodes, args.dry_run, wandb_enabled
         )
 
     if args.phase == 'nstep' or args.phase == 'all':
         run_nstep_ablation(
-            args.scenarios, args.seeds, args.episodes, args.dry_run
+            args.scenarios, args.seeds, args.episodes, args.dry_run, wandb_enabled
         )
 
     if args.phase == 'extensions' or args.phase == 'all':
         run_extension_ablation(
-            args.scenarios, args.seeds, args.episodes, args.dry_run
+            args.scenarios, args.seeds, args.episodes, args.dry_run, wandb_enabled
         )
 
     # Aggregate results at the end
