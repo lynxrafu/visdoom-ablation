@@ -111,16 +111,6 @@ training:
 # Logging Settings
 # =============================================================================
 logging:
-  # Enable Weights & Biases logging (ALWAYS enabled for training runs)
-  # Set to false only for quick tests
-  wandb_enabled: true
-
-  # WandB project name
-  wandb_project: "vizdoom-ablation"
-
-  # WandB entity (team/username) - leave empty for personal account
-  wandb_entity: ""
-
   # Enable CSV logging (for IEEE report)
   csv_log: true
 

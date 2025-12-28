@@ -230,13 +230,10 @@ class TrainingConfig:
 @dataclass
 class LoggingConfig:
     """Logging configuration schema."""
-    wandb_enabled: bool
-    wandb_project: str
-    wandb_entity: str
     csv_log: bool
     log_freq: int
-    level: str = "INFO"  # New: logging level
-    flush_every: int = 10  # New: CSV flush frequency
+    level: str = "INFO"
+    flush_every: int = 10
 
     def __post_init__(self):
         # Validate log_freq
@@ -349,9 +346,6 @@ def validate_config(config: DictConfig) -> None:
     # Validate logging section
     try:
         LoggingConfig(
-            wandb_enabled=config.logging.wandb_enabled,
-            wandb_project=config.logging.wandb_project,
-            wandb_entity=config.logging.get('wandb_entity', ''),
             csv_log=config.logging.csv_log,
             log_freq=config.logging.log_freq,
             level=config.logging.get('level', 'INFO'),

@@ -27,7 +27,7 @@ import torch
 
 from src.envs import make_vizdoom_env
 from src.utils.factory import build_agent, build_buffer
-from src.utils.logging import WandbLogger, SafeCSVLogger, setup_logger, get_logger
+from src.utils.logging import SafeCSVLogger, setup_logger, get_logger
 from src.utils.plotting import plot_learning_curve
 from src.utils.config_schema import validate_config, ConfigValidationError, print_config_summary
 
@@ -586,15 +586,6 @@ def main(config: DictConfig) -> float:
     logger.info(f"Agent: {agent}")
     logger.info(f"Buffer capacity: {config.buffer.capacity}")
 
-    # Setup logging - save to run directory
-    # Use run_id for WandB to ensure unique names across runs
-    wandb_logger = WandbLogger(
-        project=config.logging.wandb_project,
-        config=OmegaConf.to_container(config, resolve=True),
-        run_name=run_id,  # Unique timestamped name
-        enabled=config.logging.wandb_enabled
-    )
-
     # Safe CSV logger with auto-flush for Colab safety
     flush_every = config.logging.get('flush_every', 10)
     csv_logger = None
@@ -650,40 +641,7 @@ def main(config: DictConfig) -> float:
             elapsed_time = (time.time() - start_time) + previous_elapsed
             avg_reward_100 = np.mean(episode_rewards[-100:])
 
-            # Namespaced WandB metrics for organized dashboard
-            wandb_log_data = {
-                # Training metrics
-                'train/reward': reward,
-                'train/reward_avg_100': avg_reward_100,
-                'train/length': length,
-                'train/loss': metrics['mean_loss'],
-                'train/mean_q': metrics['mean_q'],
-                'train/max_q': metrics.get('max_q', 0.0),
-                # Agent state
-                'agent/epsilon': agent.epsilon,
-                'agent/grad_norm': metrics.get('grad_norm', 0.0),
-                # Buffer state
-                'buffer/size': len(buffer),
-                # TD error statistics
-                'td/error_mean': metrics.get('td_error_mean', 0.0),
-                'td/error_std': metrics.get('td_error_std', 0.0),
-                'td/error_max': metrics.get('td_error_max', 0.0),
-                # Action distribution (for exploration analysis)
-                'actions/entropy': metrics.get('action_entropy', 0.0),
-                'actions/most_common': metrics.get('action_most_common', 0),
-                # Time tracking
-                'time/hours': elapsed_time / 3600,
-            }
-
-            # Log individual action counts if available
-            action_counts = metrics.get('action_counts')
-            if action_counts is not None:
-                for i, count in enumerate(action_counts):
-                    wandb_log_data[f'actions/action_{i}_count'] = int(count)
-
-            wandb_logger.log(wandb_log_data, step=episode)
-
-            # CSV uses flat structure for simplicity
+            # CSV logging
             if csv_logger:
                 csv_logger.log({
                     'episode': episode,
@@ -706,7 +664,6 @@ def main(config: DictConfig) -> float:
         # Evaluation
         if episode % config.training.eval_freq == 0 and episode > 0:
             eval_metrics = evaluate(env, agent, config.training.eval_episodes)
-            wandb_logger.log(eval_metrics, step=episode)
 
             logger.info(
                 f"  [EVAL] Mean: {eval_metrics['eval/reward_mean']:.2f} +/- "
@@ -778,7 +735,6 @@ def main(config: DictConfig) -> float:
     if csv_logger:
         csv_logger.close()
         logger.info("CSV logger closed.")
-    wandb_logger.finish()
     env.close()
 
     logger.info(f"All outputs saved to: {run_dir}")

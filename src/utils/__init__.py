@@ -3,14 +3,14 @@ Utility modules for training and evaluation.
 
 Includes:
 - Replay buffers (uniform and prioritized)
-- Logging (WandB and CSV)
+- Logging (CSV)
 - Plotting (learning curves, comparisons)
 - Factory functions (agent and buffer builders)
 - Analysis (results comparison and reporting)
 """
 
 from .replay_buffer import ReplayBuffer, PrioritizedReplayBuffer, SumTree
-from .logging import WandbLogger, CSVLogger
+from .logging import CSVLogger
 from .plotting import plot_learning_curve, plot_comparison, plot_ablation_heatmap
 from .factory import build_agent, build_buffer
 from .analysis import (
@@ -28,7 +28,6 @@ __all__ = [
     "PrioritizedReplayBuffer",
     "SumTree",
     # Logging
-    "WandbLogger",
     "CSVLogger",
     # Plotting
     "plot_learning_curve",
