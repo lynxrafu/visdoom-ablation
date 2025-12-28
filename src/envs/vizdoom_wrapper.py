@@ -194,9 +194,16 @@ class DictActionWrapper(gym.ActionWrapper):
         """Convert discrete action to original action space format."""
         action_values = self.action_list[action]
 
-        # ViZDoom gymnasium wrapper expects numpy array of button states
-        # regardless of whether action_space is Dict or MultiDiscrete
-        return np.array(action_values, dtype=np.float32)
+        if isinstance(self.original_action_space, gym.spaces.Dict):
+            # ViZDoom Dict action space requires dict with matching keys
+            # Each key maps to a numpy array with the button value
+            return {
+                key: np.array(action_values[i], dtype=self.original_action_space[key].dtype)
+                for i, key in enumerate(self.action_keys)
+            }
+        else:
+            # MultiDiscrete expects numpy array
+            return np.array(action_values, dtype=np.int64)
 
 
 class PreprocessWrapper(gym.ObservationWrapper):
