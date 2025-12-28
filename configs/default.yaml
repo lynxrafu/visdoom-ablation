@@ -121,6 +121,17 @@ logging:
   # Episodes between log entries
   log_freq: 10
 
+  # Python logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  # DEBUG: All messages including detailed debug info
+  # INFO: Standard training progress (default)
+  # WARNING: Only warnings and errors
+  level: "INFO"
+
+  # CSV flush frequency (rows between disk writes)
+  # Lower = safer on Colab (no data loss), higher = better performance
+  # Recommended: 10 for Colab, 50-100 for local training
+  flush_every: 10
+
 # =============================================================================
 # Hardware Settings
 # =============================================================================

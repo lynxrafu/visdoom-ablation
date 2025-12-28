@@ -2,15 +2,219 @@
 Logging utilities for experiment tracking.
 
 This module provides:
+- setup_logger: Configure Python logging with file and console handlers
+- SafeCSVLogger: CSV logging with auto-flush for Colab safety
 - WandbLogger: Weights & Biases integration for cloud logging
-- CSVLogger: Simple CSV logging for IEEE report results
+- CSVLogger: Simple CSV logging for IEEE report results (legacy)
+- MetricsTracker: Running statistics for metrics
 """
 
 import os
 import csv
-from typing import Dict, Any, Optional, List
+import sys
+import logging
+from typing import Dict, Any, Optional, List, Union
 from datetime import datetime
 from pathlib import Path
+
+
+# =============================================================================
+# Python Logging Setup
+# =============================================================================
+
+def setup_logger(
+    name: str = "vizdoom",
+    level: str = "INFO",
+    log_file: Optional[Union[str, Path]] = None,
+    console: bool = True,
+    format_string: Optional[str] = None
+) -> logging.Logger:
+    """
+    Setup a logger with console and/or file handlers.
+
+    Designed for Colab safety: file handler uses immediate flush
+    to prevent data loss on session disconnect.
+
+    Args:
+        name: Logger name (e.g., "vizdoom.train", "vizdoom.agent")
+        level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        log_file: Optional path to log file
+        console: Whether to log to console (stdout)
+        format_string: Custom format string (default includes timestamp)
+
+    Returns:
+        Configured logger instance
+
+    Example:
+        >>> logger = setup_logger("vizdoom.train", level="INFO", log_file="run/training.log")
+        >>> logger.info("Training started")
+        >>> logger.debug("Detailed debug info")  # Only shown if level=DEBUG
+    """
+    logger = logging.getLogger(name)
+    logger.setLevel(getattr(logging, level.upper()))
+
+    # Clear existing handlers to avoid duplicates
+    logger.handlers = []
+
+    # Default format with timestamp for Colab traceability
+    if format_string is None:
+        format_string = "[%(asctime)s] %(levelname)s [%(name)s]: %(message)s"
+
+    formatter = logging.Formatter(format_string, datefmt="%Y-%m-%d %H:%M:%S")
+
+    # Console handler
+    if console:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
+        console_handler.setLevel(getattr(logging, level.upper()))
+        logger.addHandler(console_handler)
+
+    # File handler with immediate flush for Colab safety
+    if log_file is not None:
+        log_path = Path(log_file)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        file_handler = logging.FileHandler(log_path, mode='a')
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(logging.DEBUG)  # File captures all levels
+
+        # Wrap write to force immediate flush (Colab safety)
+        original_emit = file_handler.emit
+
+        def emit_with_flush(record):
+            original_emit(record)
+            file_handler.flush()
+
+        file_handler.emit = emit_with_flush
+        logger.addHandler(file_handler)
+
+    # Prevent propagation to root logger
+    logger.propagate = False
+
+    return logger
+
+
+def get_logger(name: str = "vizdoom") -> logging.Logger:
+    """
+    Get an existing logger by name.
+
+    Args:
+        name: Logger name
+
+    Returns:
+        Logger instance (creates basic one if doesn't exist)
+    """
+    return logging.getLogger(name)
+
+
+# =============================================================================
+# Safe CSV Logger (Colab-Optimized)
+# =============================================================================
+
+class SafeCSVLogger:
+    """
+    CSV logger with auto-flush for Colab safety.
+
+    Keeps file handle open for efficiency but flushes periodically
+    to prevent data loss on Colab session disconnect.
+
+    Args:
+        filepath: Path to CSV file
+        fieldnames: List of column names
+        flush_every: Flush to disk every N rows (default: 10)
+
+    Example:
+        >>> logger = SafeCSVLogger("results/training.csv", ["episode", "reward"])
+        >>> logger.log({"episode": 1, "reward": 50.0})
+        >>> logger.log({"episode": 2, "reward": 60.0})
+        >>> logger.close()  # Or use as context manager
+    """
+
+    def __init__(
+        self,
+        filepath: Union[str, Path],
+        fieldnames: List[str],
+        flush_every: int = 10
+    ) -> None:
+        self.filepath = Path(filepath)
+        self.fieldnames = fieldnames
+        self.flush_every = flush_every
+        self._count = 0
+        self._closed = False
+
+        # Create directory if needed
+        self.filepath.parent.mkdir(parents=True, exist_ok=True)
+
+        # Open file and keep handle (efficiency)
+        self._file = open(self.filepath, 'w', newline='', encoding='utf-8')
+        self._writer = csv.DictWriter(self._file, fieldnames=fieldnames)
+        self._writer.writeheader()
+        self._file.flush()  # Flush header immediately
+
+    def log(self, row: Dict[str, Any]) -> None:
+        """
+        Log a single row to CSV.
+
+        Auto-flushes every `flush_every` rows for Colab safety.
+
+        Args:
+            row: Dictionary with fieldname -> value
+        """
+        if self._closed:
+            raise RuntimeError("Cannot log to closed SafeCSVLogger")
+
+        self._writer.writerow(row)
+        self._count += 1
+
+        # Auto-flush for Colab safety
+        if self._count % self.flush_every == 0:
+            self._file.flush()
+
+    def log_batch(self, rows: List[Dict[str, Any]]) -> None:
+        """
+        Log multiple rows and flush.
+
+        Args:
+            rows: List of row dictionaries
+        """
+        if self._closed:
+            raise RuntimeError("Cannot log to closed SafeCSVLogger")
+
+        self._writer.writerows(rows)
+        self._count += len(rows)
+        self._file.flush()  # Always flush after batch
+
+    def flush(self) -> None:
+        """Force flush to disk (call after checkpoints)."""
+        if not self._closed:
+            self._file.flush()
+
+    def close(self) -> None:
+        """Close file handle."""
+        if not self._closed:
+            self._file.flush()
+            self._file.close()
+            self._closed = True
+
+    def __enter__(self) -> "SafeCSVLogger":
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit - ensures file is closed."""
+        self.close()
+
+    def __del__(self) -> None:
+        """Destructor - ensures file is closed."""
+        try:
+            self.close()
+        except Exception:
+            pass  # Ignore errors during cleanup
+
+    @property
+    def row_count(self) -> int:
+        """Number of rows logged."""
+        return self._count
 
 
 class WandbLogger:

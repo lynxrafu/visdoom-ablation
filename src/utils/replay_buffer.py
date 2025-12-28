@@ -161,6 +161,81 @@ class ReplayBuffer:
         """Return current buffer size."""
         return self.size
 
+    def save_state(self, filepath: str) -> None:
+        """
+        Save buffer state to compressed file.
+
+        Saves current buffer contents with gzip compression for
+        efficient storage and exact reproducibility.
+
+        Args:
+            filepath: Path to save file (will add .gz if not present)
+        """
+        import gzip
+        import pickle
+        from pathlib import Path
+
+        filepath = Path(filepath)
+        if not filepath.suffix == '.gz':
+            filepath = Path(str(filepath) + '.gz')
+
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+
+        state = {
+            'states': self.states[:self.size],
+            'actions': self.actions[:self.size],
+            'rewards': self.rewards[:self.size],
+            'next_states': self.next_states[:self.size],
+            'dones': self.dones[:self.size],
+            'next_actions': self.next_actions[:self.size],
+            'position': self.position,
+            'size': self.size,
+            'capacity': self.capacity,
+            'state_shape': self.state_shape,
+            'n_step': self.n_step,
+            'gamma': self.gamma,
+        }
+
+        with gzip.open(filepath, 'wb') as f:
+            pickle.dump(state, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load_state(self, filepath: str) -> None:
+        """
+        Load buffer state from compressed file.
+
+        Args:
+            filepath: Path to saved buffer state file
+        """
+        import gzip
+        import pickle
+        from pathlib import Path
+
+        filepath = Path(filepath)
+        if not filepath.exists() and not filepath.suffix == '.gz':
+            filepath = Path(str(filepath) + '.gz')
+
+        with gzip.open(filepath, 'rb') as f:
+            state = pickle.load(f)
+
+        # Verify compatibility
+        if state['state_shape'] != self.state_shape:
+            raise ValueError(
+                f"State shape mismatch: buffer has {self.state_shape}, "
+                f"loaded file has {state['state_shape']}"
+            )
+
+        # Restore state
+        loaded_size = state['size']
+        self.states[:loaded_size] = state['states']
+        self.actions[:loaded_size] = state['actions']
+        self.rewards[:loaded_size] = state['rewards']
+        self.next_states[:loaded_size] = state['next_states']
+        self.dones[:loaded_size] = state['dones']
+        self.next_actions[:loaded_size] = state['next_actions']
+        self.position = state['position']
+        self.size = loaded_size
+        self.n_step_buffer.clear()
+
 
 class SumTree:
     """
@@ -469,3 +544,91 @@ class PrioritizedReplayBuffer:
     def __len__(self) -> int:
         """Return current buffer size."""
         return self.size
+
+    def save_state(self, filepath: str) -> None:
+        """
+        Save PER buffer state to compressed file.
+
+        Saves current buffer contents including priorities with gzip
+        compression for efficient storage and exact reproducibility.
+
+        Args:
+            filepath: Path to save file (will add .gz if not present)
+        """
+        import gzip
+        import pickle
+        from pathlib import Path
+
+        filepath = Path(filepath)
+        if not filepath.suffix == '.gz':
+            filepath = Path(str(filepath) + '.gz')
+
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+
+        state = {
+            'states': self.states[:self.size] if self.size > 0 else self.states[:1],
+            'actions': self.actions[:self.size] if self.size > 0 else self.actions[:1],
+            'rewards': self.rewards[:self.size] if self.size > 0 else self.rewards[:1],
+            'next_states': self.next_states[:self.size] if self.size > 0 else self.next_states[:1],
+            'dones': self.dones[:self.size] if self.size > 0 else self.dones[:1],
+            'next_actions': self.next_actions[:self.size] if self.size > 0 else self.next_actions[:1],
+            'tree_data': self.tree.tree.copy(),
+            'tree_pointer': self.tree.data_pointer,
+            'size': self.size,
+            'max_priority': self.max_priority,
+            'frame': self.frame,
+            'capacity': self.capacity,
+            'state_shape': self.state_shape,
+            'alpha': self.alpha,
+            'beta_start': self.beta_start,
+            'beta_frames': self.beta_frames,
+            'n_step': self.n_step,
+            'gamma': self.gamma,
+        }
+
+        with gzip.open(filepath, 'wb') as f:
+            pickle.dump(state, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load_state(self, filepath: str) -> None:
+        """
+        Load PER buffer state from compressed file.
+
+        Args:
+            filepath: Path to saved buffer state file
+        """
+        import gzip
+        import pickle
+        from pathlib import Path
+
+        filepath = Path(filepath)
+        if not filepath.exists() and not filepath.suffix == '.gz':
+            filepath = Path(str(filepath) + '.gz')
+
+        with gzip.open(filepath, 'rb') as f:
+            state = pickle.load(f)
+
+        # Verify compatibility
+        if state['state_shape'] != self.state_shape:
+            raise ValueError(
+                f"State shape mismatch: buffer has {self.state_shape}, "
+                f"loaded file has {state['state_shape']}"
+            )
+
+        # Restore state
+        loaded_size = state['size']
+        if loaded_size > 0:
+            self.states[:loaded_size] = state['states']
+            self.actions[:loaded_size] = state['actions']
+            self.rewards[:loaded_size] = state['rewards']
+            self.next_states[:loaded_size] = state['next_states']
+            self.dones[:loaded_size] = state['dones']
+            self.next_actions[:loaded_size] = state['next_actions']
+
+        # Restore tree
+        self.tree.tree = state['tree_data']
+        self.tree.data_pointer = state['tree_pointer']
+
+        self.size = loaded_size
+        self.max_priority = state['max_priority']
+        self.frame = state['frame']
+        self.n_step_buffer.clear()

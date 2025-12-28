@@ -140,11 +140,20 @@ class DeepSARSAAgent(DQNAgent):
         self.optimizer.zero_grad()
         loss.backward()
 
+        # Gradient clipping for stability and capture gradient norm
+        grad_norm = 0.0
         if self.grad_clip > 0:
-            torch.nn.utils.clip_grad_norm_(
+            grad_norm = torch.nn.utils.clip_grad_norm_(
                 self.online_network.parameters(),
                 self.grad_clip
-            )
+            ).item()
+        else:
+            # Calculate grad norm without clipping
+            total_norm = 0.0
+            for p in self.online_network.parameters():
+                if p.grad is not None:
+                    total_norm += p.grad.data.norm(2).item() ** 2
+            grad_norm = total_norm ** 0.5
 
         self.optimizer.step()
 
@@ -153,11 +162,19 @@ class DeepSARSAAgent(DQNAgent):
         if self.total_steps % self.target_update_freq == 0:
             self.sync_target_network()
 
+        # TD error statistics for scientific analysis
+        td_errors_np = td_errors.cpu().numpy()
+
+        # Return metrics (enhanced for scientific rigor)
         return {
             'loss': loss.item(),
-            'td_errors': td_errors.cpu().numpy(),
+            'td_errors': td_errors_np,
             'mean_q': q_values.mean().item(),
-            'max_q': q_values.max().item()
+            'max_q': q_values.max().item(),
+            'grad_norm': grad_norm,
+            'td_error_mean': float(td_errors_np.mean()),
+            'td_error_std': float(td_errors_np.std()),
+            'td_error_max': float(td_errors_np.max()),
         }
 
     def get_config(self) -> Dict[str, Any]:

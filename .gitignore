@@ -144,3 +144,4 @@ data/
 # =============================================================================
 !results/.gitkeep
 !checkpoints/.gitkeep
+docs/IMPLEMENTATION_PLAN.md
