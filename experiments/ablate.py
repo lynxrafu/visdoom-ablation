@@ -22,21 +22,96 @@ Phases:
 
 import os
 import sys
+import json
 import argparse
 import subprocess
 from itertools import product
 from pathlib import Path
 from datetime import datetime
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 
+def find_existing_run(
+    agent_type: str,
+    scenario: str,
+    seed: int,
+    num_episodes: int,
+    results_dir: str = "results"
+) -> Tuple[Optional[Path], str]:
+    """
+    Find an existing run directory for the given configuration.
+
+    Args:
+        agent_type: Agent type (dqn, deep_sarsa, etc.)
+        scenario: ViZDoom scenario
+        seed: Random seed
+        num_episodes: Expected number of episodes
+        results_dir: Results directory path
+
+    Returns:
+        Tuple of (run_dir, status) where status is:
+        - "not_found": No matching run found
+        - "complete": Run is complete (has summary.json)
+        - "incomplete": Run is incomplete (can resume)
+    """
+    results_path = Path(results_dir)
+    if not results_path.exists():
+        return None, "not_found"
+
+    # Search all date directories
+    for date_dir in sorted(results_path.iterdir(), reverse=True):
+        if not date_dir.is_dir():
+            continue
+
+        # Search run directories
+        for run_dir in date_dir.iterdir():
+            if not run_dir.is_dir():
+                continue
+
+            # Check metadata
+            metadata_file = run_dir / "metadata.json"
+            if not metadata_file.exists():
+                continue
+
+            try:
+                with open(metadata_file) as f:
+                    metadata = json.load(f)
+
+                # Match configuration
+                if (metadata.get('agent_type') == agent_type and
+                    metadata.get('scenario') == scenario and
+                    metadata.get('seed') == seed):
+
+                    # Check if complete
+                    summary_file = run_dir / "summary.json"
+                    if summary_file.exists():
+                        with open(summary_file) as f:
+                            summary = json.load(f)
+                        if summary.get('num_episodes', 0) >= num_episodes:
+                            return run_dir, "complete"
+
+                    # Check if has training state (can resume)
+                    training_state = run_dir / "checkpoints" / "training_state.json"
+                    if training_state.exists():
+                        return run_dir, "incomplete"
+
+                    # Has metadata but no progress - treat as incomplete
+                    return run_dir, "incomplete"
+
+            except (json.JSONDecodeError, KeyError):
+                continue
+
+    return None, "not_found"
+
+
 def run_experiment(
     args: List[str],
-    dry_run: bool = False
+    dry_run: bool = False,
+    resume_from: Optional[Path] = None
 ) -> int:
     """
     Run a single training experiment.
@@ -44,23 +119,75 @@ def run_experiment(
     Args:
         args: Command line arguments for train.py
         dry_run: If True, just print command without running
+        resume_from: Optional path to resume from
 
     Returns:
         Return code from subprocess
     """
+    # Add resume flag if resuming
+    if resume_from:
+        args = args + [f'training.resume_from={resume_from}']
+
     cmd = ['python', 'experiments/train.py'] + args
     cmd_str = ' '.join(cmd)
 
     if dry_run:
-        print(f"[DRY RUN] {cmd_str}")
+        prefix = "[DRY RUN]" if not resume_from else "[DRY RUN - RESUME]"
+        print(f"{prefix} {cmd_str}")
         return 0
 
     print(f"\n{'=' * 60}")
+    if resume_from:
+        print(f"RESUMING: {resume_from}")
     print(f"Running: {cmd_str}")
     print('=' * 60)
 
     result = subprocess.run(cmd, cwd=str(PROJECT_ROOT))
     return result.returncode
+
+
+def run_with_resume(
+    agent_type: str,
+    scenario: str,
+    seed: int,
+    num_episodes: int,
+    extra_args: List[str],
+    dry_run: bool = False
+) -> int:
+    """
+    Run experiment with automatic resume detection.
+
+    Args:
+        agent_type: Agent type
+        scenario: ViZDoom scenario
+        seed: Random seed
+        num_episodes: Training episodes
+        extra_args: Additional args for train.py
+        dry_run: If True, just print commands
+
+    Returns:
+        Return code
+    """
+    # Check for existing run
+    run_dir, status = find_existing_run(agent_type, scenario, seed, num_episodes)
+
+    if status == "complete":
+        print(f"\n[SKIP] Already complete: {agent_type} on {scenario} seed={seed}")
+        return 0
+
+    # Build base args
+    args = [
+        f'agent.type={agent_type}',
+        f'env.scenario={scenario}',
+        f'seed={seed}',
+        f'training.num_episodes={num_episodes}',
+    ] + extra_args
+
+    if status == "incomplete":
+        print(f"\n[RESUME] Found incomplete run: {run_dir}")
+        return run_experiment(args, dry_run, resume_from=run_dir)
+    else:
+        return run_experiment(args, dry_run)
 
 
 def run_algorithm_comparison(
@@ -85,14 +212,14 @@ def run_algorithm_comparison(
     algorithms = ['dqn', 'deep_sarsa']
 
     for algo, scenario, seed in product(algorithms, scenarios, seeds):
-        args = [
-            f'agent.type={algo}',
-            f'env.scenario={scenario}',
-            f'seed={seed}',
-            f'training.num_episodes={num_episodes}',
-            'logging.wandb_enabled=true'
-        ]
-        run_experiment(args, dry_run)
+        run_with_resume(
+            agent_type=algo,
+            scenario=scenario,
+            seed=seed,
+            num_episodes=num_episodes,
+            extra_args=['logging.wandb_enabled=true'],
+            dry_run=dry_run
+        )
 
 
 def run_lr_ablation(
@@ -111,14 +238,14 @@ def run_lr_ablation(
     learning_rates = [0.0001, 0.001, 0.01]
 
     for lr, scenario, seed in product(learning_rates, scenarios, seeds):
-        args = [
-            f'agent.learning_rate={lr}',
-            f'env.scenario={scenario}',
-            f'seed={seed}',
-            f'training.num_episodes={num_episodes}',
-            'logging.wandb_enabled=true'
-        ]
-        run_experiment(args, dry_run)
+        run_with_resume(
+            agent_type='dqn',
+            scenario=scenario,
+            seed=seed,
+            num_episodes=num_episodes,
+            extra_args=[f'agent.learning_rate={lr}', 'logging.wandb_enabled=true'],
+            dry_run=dry_run
+        )
 
 
 def run_gamma_ablation(
@@ -137,14 +264,14 @@ def run_gamma_ablation(
     gammas = [0.9, 0.99]
 
     for gamma, scenario, seed in product(gammas, scenarios, seeds):
-        args = [
-            f'agent.gamma={gamma}',
-            f'env.scenario={scenario}',
-            f'seed={seed}',
-            f'training.num_episodes={num_episodes}',
-            'logging.wandb_enabled=true'
-        ]
-        run_experiment(args, dry_run)
+        run_with_resume(
+            agent_type='dqn',
+            scenario=scenario,
+            seed=seed,
+            num_episodes=num_episodes,
+            extra_args=[f'agent.gamma={gamma}', 'logging.wandb_enabled=true'],
+            dry_run=dry_run
+        )
 
 
 def run_nstep_ablation(
@@ -163,14 +290,14 @@ def run_nstep_ablation(
     n_steps = [1, 3]  # 1 = TD, 3 = more MC-like
 
     for n, scenario, seed in product(n_steps, scenarios, seeds):
-        args = [
-            f'agent.n_step={n}',
-            f'env.scenario={scenario}',
-            f'seed={seed}',
-            f'training.num_episodes={num_episodes}',
-            'logging.wandb_enabled=true'
-        ]
-        run_experiment(args, dry_run)
+        run_with_resume(
+            agent_type='dqn',
+            scenario=scenario,
+            seed=seed,
+            num_episodes=num_episodes,
+            extra_args=[f'agent.n_step={n}', 'logging.wandb_enabled=true'],
+            dry_run=dry_run
+        )
 
 
 def run_extension_ablation(
@@ -198,20 +325,24 @@ def run_extension_ablation(
 
     for (algo, per, desc), scenario, seed in product(configs, scenarios, seeds):
         print(f"\nConfiguration: {desc}")
-        args = [
-            f'agent.type={algo}',
+
+        extra_args = [
             f'buffer.prioritized={str(per).lower()}',
-            f'env.scenario={scenario}',
-            f'seed={seed}',
-            f'training.num_episodes={num_episodes}',
             'logging.wandb_enabled=true'
         ]
 
         # For dueling, also enable double_dqn
         if algo == 'dueling':
-            args.append('agent.double_dqn=true')
+            extra_args.append('agent.double_dqn=true')
 
-        run_experiment(args, dry_run)
+        run_with_resume(
+            agent_type=algo,
+            scenario=scenario,
+            seed=seed,
+            num_episodes=num_episodes,
+            extra_args=extra_args,
+            dry_run=dry_run
+        )
 
 
 def aggregate_results(output_dir: str = "results") -> None:

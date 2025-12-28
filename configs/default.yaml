@@ -78,6 +78,11 @@ training:
   # Total number of training episodes
   num_episodes: 2000
 
+  # Resume from checkpoint directory (empty string = start fresh)
+  # Set to a run directory path to resume training from last checkpoint
+  # Example: "results/2025-12-28/16-44-48_dqn_Basic_lr0.0001_seed42"
+  resume_from: ""
+
   # Maximum steps per episode (prevents infinite episodes)
   max_steps_per_episode: 1000
 

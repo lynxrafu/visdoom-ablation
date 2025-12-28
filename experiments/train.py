@@ -248,6 +248,138 @@ def evaluate(
     }
 
 
+def save_training_state(
+    run_dir: Path,
+    episode: int,
+    episode_rewards: list,
+    best_eval_reward: float,
+    start_time: float,
+    buffer,
+    agent
+) -> None:
+    """
+    Save complete training state for resume functionality.
+
+    Saves:
+    - Training progress (episode number, rewards history)
+    - Agent checkpoint (network weights, optimizer, epsilon)
+    - Buffer state (all transitions)
+
+    Args:
+        run_dir: Run directory path
+        episode: Current episode number
+        episode_rewards: List of all episode rewards
+        best_eval_reward: Best evaluation reward so far
+        start_time: Training start time
+        buffer: Replay buffer
+        agent: RL agent
+    """
+    import json
+
+    checkpoint_dir = run_dir / "checkpoints"
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save training state
+    training_state = {
+        'episode': episode,
+        'episode_rewards': episode_rewards,
+        'best_eval_reward': best_eval_reward,
+        'elapsed_time': time.time() - start_time,
+        'buffer_size': len(buffer),
+    }
+    with open(checkpoint_dir / "training_state.json", 'w') as f:
+        json.dump(training_state, f, indent=2)
+
+    # Save agent (overwrites previous)
+    agent.save(str(checkpoint_dir / "latest.pt"))
+
+    # Save buffer state (for exact reproducibility)
+    buffer.save_state(str(checkpoint_dir / "buffer_state.gz"))
+
+
+def load_training_state(
+    resume_dir: Path,
+    agent,
+    buffer,
+    logger
+) -> tuple:
+    """
+    Load training state from a checkpoint directory.
+
+    Args:
+        resume_dir: Directory containing checkpoint files
+        agent: RL agent to load weights into
+        buffer: Replay buffer to load state into
+        logger: Logger for messages
+
+    Returns:
+        Tuple of (start_episode, episode_rewards, best_eval_reward, elapsed_time)
+    """
+    import json
+
+    checkpoint_dir = resume_dir / "checkpoints"
+
+    # Load training state
+    state_file = checkpoint_dir / "training_state.json"
+    if not state_file.exists():
+        raise FileNotFoundError(f"No training state found at {state_file}")
+
+    with open(state_file) as f:
+        training_state = json.load(f)
+
+    start_episode = training_state['episode'] + 1  # Resume from next episode
+    episode_rewards = training_state['episode_rewards']
+    best_eval_reward = training_state['best_eval_reward']
+    elapsed_time = training_state.get('elapsed_time', 0)
+
+    logger.info(f"Loaded training state: episode {training_state['episode']}, "
+                f"rewards count: {len(episode_rewards)}, "
+                f"best eval: {best_eval_reward:.2f}")
+
+    # Load agent checkpoint
+    agent_file = checkpoint_dir / "latest.pt"
+    if agent_file.exists():
+        agent.load(str(agent_file))
+        logger.info(f"Loaded agent checkpoint from {agent_file}")
+        logger.info(f"Agent epsilon: {agent.epsilon:.4f}, steps: {agent.total_steps}")
+    else:
+        logger.warning(f"No agent checkpoint found at {agent_file}")
+
+    # Load buffer state
+    buffer_file = checkpoint_dir / "buffer_state.gz"
+    if buffer_file.exists():
+        buffer.load_state(str(buffer_file))
+        logger.info(f"Loaded buffer state: {len(buffer)} transitions")
+    else:
+        logger.warning(f"No buffer state found at {buffer_file}")
+
+    return start_episode, episode_rewards, best_eval_reward, elapsed_time
+
+
+def find_latest_checkpoint(run_dir: Path) -> Optional[int]:
+    """
+    Find the latest checkpoint episode number in a run directory.
+
+    Args:
+        run_dir: Run directory path
+
+    Returns:
+        Latest episode number, or None if no checkpoints found
+    """
+    checkpoint_dir = run_dir / "checkpoints"
+    if not checkpoint_dir.exists():
+        return None
+
+    training_state = checkpoint_dir / "training_state.json"
+    if training_state.exists():
+        import json
+        with open(training_state) as f:
+            state = json.load(f)
+        return state.get('episode')
+
+    return None
+
+
 def create_run_directory(config: DictConfig) -> tuple:
     """
     Create a unique, timestamped run directory for Colab/Drive persistence.
@@ -373,8 +505,33 @@ def main(config: DictConfig) -> float:
         print(f"ERROR: {e}")
         return float('-inf')
 
-    # Create unique run directory (timestamped, never overwrites)
-    run_dir, run_name, run_id = create_run_directory(config)
+    # Check if resuming from a previous run
+    resume_from = config.training.get('resume_from', '')
+    resuming = bool(resume_from)
+
+    if resuming:
+        # Use existing run directory
+        run_dir = Path(resume_from)
+        if not run_dir.exists():
+            print(f"ERROR: Resume directory not found: {run_dir}")
+            return float('-inf')
+
+        # Load metadata for run name/id
+        import json
+        metadata_file = run_dir / "metadata.json"
+        if metadata_file.exists():
+            with open(metadata_file) as f:
+                metadata = json.load(f)
+            run_name = metadata.get('run_name', run_dir.name)
+            run_id = metadata.get('run_id', run_dir.name)
+        else:
+            run_name = run_dir.name
+            run_id = run_dir.name
+
+        print(f"RESUMING from: {run_dir}")
+    else:
+        # Create unique run directory (timestamped, never overwrites)
+        run_dir, run_name, run_id = create_run_directory(config)
 
     # Setup Python logger (file + console)
     log_level = config.logging.get('level', 'INFO')
@@ -452,15 +609,33 @@ def main(config: DictConfig) -> float:
         )
         logger.info(f"CSV logging enabled (flush every {flush_every} rows)")
 
-    # Training loop
+    # Training loop initialization
+    start_episode = 0
     episode_rewards = []
     start_time = time.time()
     best_eval_reward = float('-inf')
+    previous_elapsed = 0
+
+    # Load training state if resuming
+    if resuming:
+        try:
+            start_episode, episode_rewards, best_eval_reward, previous_elapsed = \
+                load_training_state(run_dir, agent, buffer, logger)
+            logger.info(f"Resuming from episode {start_episode}")
+            logger.info(f"Previous training time: {previous_elapsed / 3600:.2f} hours")
+        except FileNotFoundError as e:
+            logger.warning(f"Could not load training state: {e}")
+            logger.warning("Starting fresh instead of resuming")
+            start_episode = 0
+
+    if start_episode >= config.training.num_episodes:
+        logger.info("Training already complete!")
+        return np.mean(episode_rewards[-100:]) if episode_rewards else 0.0
 
     logger.info("Starting training...")
     logger.info("-" * 60)
 
-    for episode in range(config.training.num_episodes):
+    for episode in range(start_episode, config.training.num_episodes):
         # Train one episode
         reward, length, metrics = train_episode(
             env, agent, buffer, config, training=True
@@ -472,7 +647,7 @@ def main(config: DictConfig) -> float:
 
         # Logging
         if episode % config.logging.log_freq == 0:
-            elapsed_time = time.time() - start_time
+            elapsed_time = (time.time() - start_time) + previous_elapsed
             avg_reward_100 = np.mean(episode_rewards[-100:])
 
             # Namespaced WandB metrics for organized dashboard
@@ -547,10 +722,15 @@ def main(config: DictConfig) -> float:
                 if csv_logger:
                     csv_logger.flush()
 
-        # Periodic checkpoint
+        # Periodic checkpoint with full training state (for resume)
         if episode % config.training.save_freq == 0 and episode > 0:
             agent.save(str(run_dir / "checkpoints" / f"ep{episode}.pt"))
-            logger.info(f"  Checkpoint saved: ep{episode}.pt")
+            # Save complete training state for resume functionality
+            save_training_state(
+                run_dir, episode, episode_rewards, best_eval_reward,
+                start_time - previous_elapsed, buffer, agent
+            )
+            logger.info(f"  Checkpoint saved: ep{episode}.pt (with resume state)")
             # Force flush CSV after checkpoint save (Colab safety)
             if csv_logger:
                 csv_logger.flush()
@@ -559,7 +739,7 @@ def main(config: DictConfig) -> float:
     agent.save(str(run_dir / "checkpoints" / "final.pt"))
 
     # Training complete
-    total_time = time.time() - start_time
+    total_time = (time.time() - start_time) + previous_elapsed
     final_avg_reward = np.mean(episode_rewards[-100:])
 
     logger.info("-" * 60)
