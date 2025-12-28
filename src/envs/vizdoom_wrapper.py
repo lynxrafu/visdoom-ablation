@@ -85,7 +85,7 @@ VIZDOOM_SCENARIOS = {
     },
     'VizdoomDeathmatch-v0': {
         'description': 'Combat task - kill enemies, survive',
-        'actions': 6,  # Complex movement + shooting
+        'actions': 15,  # Discretized from Dict space (see DictActionWrapper)
         'max_steps': 4200,
         'difficulty': 'hard'
     },
@@ -96,6 +96,110 @@ VIZDOOM_SCENARIOS = {
         'difficulty': 'hard'
     }
 }
+
+
+class DictActionWrapper(gym.ActionWrapper):
+    """
+    Convert Dict/MultiDiscrete action space to Discrete.
+
+    Some ViZDoom scenarios (like Deathmatch) have complex action spaces
+    with multiple action dimensions. This wrapper flattens them into
+    a single Discrete space by enumerating all valid action combinations.
+
+    For example, if the action space has:
+    - binary[0]: ATTACK (0 or 1)
+    - binary[1]: MOVE_FORWARD (0 or 1)
+    - binary[2]: TURN_LEFT (0 or 1)
+    - binary[3]: TURN_RIGHT (0 or 1)
+
+    We create discrete actions for useful combinations like:
+    - 0: No action
+    - 1: Attack
+    - 2: Move forward
+    - 3: Move forward + Attack
+    - 4: Turn left
+    - 5: Turn right
+    - etc.
+
+    Args:
+        env: Gymnasium environment with Dict action space
+    """
+
+    # Predefined action combinations for Deathmatch-like scenarios
+    # Each tuple represents: (ATTACK, MOVE_FORWARD, MOVE_BACKWARD, TURN_LEFT, TURN_RIGHT, ...)
+    DEATHMATCH_ACTIONS = [
+        # Basic movement
+        [0, 0, 0, 0, 0, 0, 0],  # 0: No action
+        [1, 0, 0, 0, 0, 0, 0],  # 1: Attack
+        [0, 1, 0, 0, 0, 0, 0],  # 2: Move forward
+        [0, 0, 1, 0, 0, 0, 0],  # 3: Move backward
+        [0, 0, 0, 1, 0, 0, 0],  # 4: Turn left
+        [0, 0, 0, 0, 1, 0, 0],  # 5: Turn right
+        # Attack + movement
+        [1, 1, 0, 0, 0, 0, 0],  # 6: Attack + Move forward
+        [1, 0, 0, 1, 0, 0, 0],  # 7: Attack + Turn left
+        [1, 0, 0, 0, 1, 0, 0],  # 8: Attack + Turn right
+        # Strafe
+        [0, 0, 0, 0, 0, 1, 0],  # 9: Move left (strafe)
+        [0, 0, 0, 0, 0, 0, 1],  # 10: Move right (strafe)
+        # Combined
+        [0, 1, 0, 1, 0, 0, 0],  # 11: Move forward + Turn left
+        [0, 1, 0, 0, 1, 0, 0],  # 12: Move forward + Turn right
+        [1, 1, 0, 1, 0, 0, 0],  # 13: Attack + Move forward + Turn left
+        [1, 1, 0, 0, 1, 0, 0],  # 14: Attack + Move forward + Turn right
+    ]
+
+    def __init__(self, env: gym.Env) -> None:
+        super().__init__(env)
+
+        self.original_action_space = env.action_space
+        self._setup_action_mapping()
+
+        # Create new Discrete action space
+        self.action_space = gym.spaces.Discrete(len(self.action_list))
+
+    def _setup_action_mapping(self):
+        """Setup action mapping based on original action space type."""
+        if isinstance(self.original_action_space, gym.spaces.Dict):
+            # Dict action space - get the binary actions
+            self.action_keys = list(self.original_action_space.spaces.keys())
+            self.num_binary = len(self.action_keys)
+
+            # Use predefined actions, trimmed to match action space size
+            self.action_list = []
+            for action in self.DEATHMATCH_ACTIONS:
+                if len(action) >= self.num_binary:
+                    self.action_list.append(action[:self.num_binary])
+                else:
+                    # Pad with zeros if needed
+                    padded = action + [0] * (self.num_binary - len(action))
+                    self.action_list.append(padded)
+
+        elif isinstance(self.original_action_space, gym.spaces.MultiDiscrete):
+            # MultiDiscrete action space
+            self.num_binary = len(self.original_action_space.nvec)
+            self.action_keys = None
+
+            self.action_list = []
+            for action in self.DEATHMATCH_ACTIONS:
+                if len(action) >= self.num_binary:
+                    self.action_list.append(action[:self.num_binary])
+                else:
+                    padded = action + [0] * (self.num_binary - len(action))
+                    self.action_list.append(padded)
+        else:
+            raise ValueError(f"Unsupported action space: {type(self.original_action_space)}")
+
+    def action(self, action: int):
+        """Convert discrete action to original action space format."""
+        action_values = self.action_list[action]
+
+        if isinstance(self.original_action_space, gym.spaces.Dict):
+            # Return as dict
+            return {key: action_values[i] for i, key in enumerate(self.action_keys)}
+        else:
+            # Return as array for MultiDiscrete
+            return np.array(action_values, dtype=np.int64)
 
 
 class PreprocessWrapper(gym.ObservationWrapper):
@@ -417,6 +521,11 @@ def make_vizdoom_env(
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="Detected screen format")
         env = gym.make(scenario, render_mode=render_mode, frame_skip=1)
+
+    # Handle complex action spaces (Dict/MultiDiscrete -> Discrete)
+    # This is needed for scenarios like Deathmatch
+    if not isinstance(env.action_space, gym.spaces.Discrete):
+        env = DictActionWrapper(env)
 
     # Apply wrappers in order
     if frame_skip > 1:
