@@ -158,6 +158,14 @@ class DictActionWrapper(gym.ActionWrapper):
         # Create new Discrete action space
         self.action_space = gym.spaces.Discrete(len(self.action_list))
 
+        # Debug: print action space info
+        print(f"[DictActionWrapper] Original space: {type(self.original_action_space)}")
+        if isinstance(self.original_action_space, gym.spaces.Dict):
+            print(f"[DictActionWrapper] Keys: {self.action_keys}")
+            for key in self.action_keys:
+                print(f"  {key}: {self.original_action_space[key]}")
+        print(f"[DictActionWrapper] New Discrete space: {self.action_space.n} actions")
+
     def _setup_action_mapping(self):
         """Setup action mapping based on original action space type."""
         if isinstance(self.original_action_space, gym.spaces.Dict):
