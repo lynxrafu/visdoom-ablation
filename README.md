@@ -1,6 +1,6 @@
 # ViZDoom Deep RL Ablation Study
 
-**Master's Level Reinforcement Learning Course Final Project**
+**Reinforcement Learning Course Final Project**
 
 An ablation study of deep reinforcement learning algorithms in ViZDoom environments, focusing on parameter sensitivities and extensions in visual navigation and combat tasks.
 
@@ -174,4 +174,4 @@ MIT License
 ## Acknowledgments
 
 - ViZDoom team for the research platform
-- Course instructors for project guidance
+
