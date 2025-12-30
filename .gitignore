@@ -1,14 +1,20 @@
 # ViZDoom Deep RL Ablation Study - .gitignore
 
 # =============================================================================
-# Development/Local Files (Not for public repo)
+# AI/Development Files (EXCLUDE FROM PUBLIC REPO)
 # =============================================================================
 .claude/
-needs/
-developer_journal.md
 CLAUDE.md
 claude.md
+developer_journal.md
 Project_design.md
+needs/
+docs/IMPLEMENTATION_PLAN.md
+
+# Paper drafts and templates (keep final in Overleaf, not here)
+conferance_template.tex
+gemini_iteration.tex
+
 
 # =============================================================================
 # Python
@@ -63,7 +69,7 @@ ENV/
 *.ipynb_checkpoints/
 
 # =============================================================================
-# Results and Outputs (Don't commit large files)
+# Results and Outputs (Large files - keep analysis_output for results)
 # =============================================================================
 results/
 outputs/
@@ -138,11 +144,3 @@ data/
 *.onnx
 *.tflite
 *.pb
-
-# =============================================================================
-# Keep These (Use .gitkeep)
-# =============================================================================
-!results/.gitkeep
-!checkpoints/.gitkeep
-docs/IMPLEMENTATION_PLAN.md
-conferance_template.tex

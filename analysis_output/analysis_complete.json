@@ -1,0 +1,461 @@
+{
+  "meta": {
+    "total_experiments": 33,
+    "total_training_hours": 13.190608340965376,
+    "date_generated": "2025-12-30T15:59:02.611661",
+    "scenarios": [
+      "Basic",
+      "TakeCover",
+      "Deathmatch"
+    ],
+    "methods": [
+      "DQN",
+      "DeepSARSA",
+      "DQN_n3",
+      "DQN_PER",
+      "DDQN",
+      "Dueling_DDQN"
+    ],
+    "phases": [
+      "Phase1",
+      "Phase2",
+      "Phase3a",
+      "Phase3b",
+      "Phase3c"
+    ]
+  },
+  "phase1": {
+    "Basic": {
+      "DQN": {
+        "best_eval_mean": 75.83333333333333,
+        "best_eval_std": 5.700292390161522,
+        "final_reward_mean": 60.94666666666666,
+        "final_reward_std": 18.527388734879324,
+        "training_hours_mean": 0.11258827088055785,
+        "n_seeds": 3
+      },
+      "DeepSARSA": {
+        "best_eval_mean": 67.60000000000001,
+        "best_eval_std": 15.307187854076917,
+        "final_reward_mean": 35.296666666666674,
+        "final_reward_std": 23.82857598207105,
+        "training_hours_mean": 0.11557555560712462,
+        "n_seeds": 3
+      }
+    },
+    "TakeCover": {
+      "DQN": {
+        "best_eval_mean": 1088.6666666666667,
+        "best_eval_std": 194.19089405359182,
+        "final_reward_mean": 861.6700000000001,
+        "final_reward_std": 143.5583647858947,
+        "training_hours_mean": 0.5516275268793106,
+        "n_seeds": 3
+      },
+      "DeepSARSA": {
+        "best_eval_mean": 1080.1000000000001,
+        "best_eval_std": 62.16695263562467,
+        "final_reward_mean": 783.58,
+        "final_reward_std": 36.32768503497024,
+        "training_hours_mean": 0.5934028420845667,
+        "n_seeds": 3
+      }
+    },
+    "Deathmatch": {
+      "DQN": {
+        "best_eval_mean": 5.366666666666667,
+        "best_eval_std": 1.205542754668342,
+        "final_reward_mean": 3.266666666666666,
+        "final_reward_std": 1.1679183761433558,
+        "training_hours_mean": 0.7169210428441013,
+        "n_seeds": 3
+      },
+      "DeepSARSA": {
+        "best_eval_mean": 4.333333333333333,
+        "best_eval_std": 0.9609023536933051,
+        "final_reward_mean": 2.1199999999999997,
+        "final_reward_std": 0.3251153641401771,
+        "training_hours_mean": 0.7405618555015988,
+        "n_seeds": 3
+      }
+    }
+  },
+  "phase2": {
+    "Basic": {
+      "n1": {
+        "best_eval_mean": 75.83333333333333,
+        "best_eval_std": 5.700292390161522,
+        "n_seeds": 3
+      },
+      "n3": {
+        "best_eval_mean": -175.6,
+        "best_eval_std": 175.92816715921302,
+        "n_seeds": 2
+      }
+    },
+    "TakeCover": {
+      "n1": {
+        "best_eval_mean": 1088.6666666666667,
+        "best_eval_std": 194.19089405359182,
+        "n_seeds": 3
+      },
+      "n3": {
+        "best_eval_mean": 820.8499999999999,
+        "best_eval_std": 267.3570739666336,
+        "n_seeds": 2
+      }
+    },
+    "Deathmatch": {
+      "n1": {
+        "best_eval_mean": 5.366666666666667,
+        "best_eval_std": 1.205542754668342,
+        "n_seeds": 3
+      },
+      "n3": {
+        "best_eval_mean": 7.0,
+        "best_eval_std": null,
+        "n_seeds": 1
+      }
+    }
+  },
+  "phase3": {
+    "Basic": {
+      "Baseline_DQN": {
+        "best_eval_mean": 75.83333333333333,
+        "best_eval_std": 5.700292390161522,
+        "n_seeds": 3
+      },
+      "DQN_PER": {
+        "best_eval_mean": 80.65,
+        "best_eval_std": 3.3234018715767752,
+        "n_seeds": 2
+      },
+      "DDQN": {
+        "best_eval_mean": 81.4,
+        "best_eval_std": 2.8284271247461903,
+        "n_seeds": 2
+      },
+      "Dueling_DDQN": {
+        "best_eval_mean": 79.44999999999999,
+        "best_eval_std": 4.030508652763323,
+        "n_seeds": 2
+      }
+    },
+    "TakeCover": {
+      "Baseline_DQN": {
+        "best_eval_mean": 1088.6666666666667,
+        "best_eval_std": 194.19089405359182,
+        "n_seeds": 3
+      },
+      "DQN_PER": {
+        "best_eval_mean": 1126.05,
+        "best_eval_std": 103.16687937511735,
+        "n_seeds": 2
+      },
+      "DDQN": {
+        "best_eval_mean": 1021.5,
+        "best_eval_std": 72.40773439350254,
+        "n_seeds": 2
+      }
+    }
+  },
+  "all_results": [
+    {
+      "phase": "Phase1",
+      "method": "DQN",
+      "scenario": "Basic",
+      "seed": 1,
+      "final_reward": 63.9,
+      "best_eval": 81.5,
+      "training_hours": 0.11373948289288414
+    },
+    {
+      "phase": "Phase1",
+      "method": "DQN",
+      "scenario": "Basic",
+      "seed": 2,
+      "final_reward": 41.12,
+      "best_eval": 70.1,
+      "training_hours": 0.11325655195448134
+    },
+    {
+      "phase": "Phase1",
+      "method": "DQN",
+      "scenario": "Basic",
+      "seed": 3,
+      "final_reward": 77.82,
+      "best_eval": 75.9,
+      "training_hours": 0.11076877779430813
+    },
+    {
+      "phase": "Phase1",
+      "method": "DQN",
+      "scenario": "Deathmatch",
+      "seed": 1,
+      "final_reward": 3.78,
+      "best_eval": 6.5,
+      "training_hours": 0.7780158039596345
+    },
+    {
+      "phase": "Phase1",
+      "method": "DQN",
+      "scenario": "Deathmatch",
+      "seed": 2,
+      "final_reward": 4.09,
+      "best_eval": 4.1,
+      "training_hours": 0.6735763178269069
+    },
+    {
+      "phase": "Phase1",
+      "method": "DQN",
+      "scenario": "Deathmatch",
+      "seed": 3,
+      "final_reward": 1.93,
+      "best_eval": 5.5,
+      "training_hours": 0.6991710067457623
+    },
+    {
+      "phase": "Phase1",
+      "method": "DQN",
+      "scenario": "TakeCover",
+      "seed": 1,
+      "final_reward": 938.23,
+      "best_eval": 864.7,
+      "training_hours": 0.5718637972407871
+    },
+    {
+      "phase": "Phase1",
+      "method": "DQN",
+      "scenario": "TakeCover",
+      "seed": 2,
+      "final_reward": 696.06,
+      "best_eval": 1191.2,
+      "training_hours": 0.5771943440702226
+    },
+    {
+      "phase": "Phase1",
+      "method": "DQN",
+      "scenario": "TakeCover",
+      "seed": 3,
+      "final_reward": 950.72,
+      "best_eval": 1210.1,
+      "training_hours": 0.5058244393269221
+    },
+    {
+      "phase": "Phase1",
+      "method": "DeepSARSA",
+      "scenario": "Basic",
+      "seed": 1,
+      "final_reward": 34.82,
+      "best_eval": 61.0,
+      "training_hours": 0.11041171967983246
+    },
+    {
+      "phase": "Phase1",
+      "method": "DeepSARSA",
+      "scenario": "Basic",
+      "seed": 2,
+      "final_reward": 59.36,
+      "best_eval": 85.1,
+      "training_hours": 0.10446972688039144
+    },
+    {
+      "phase": "Phase1",
+      "method": "DeepSARSA",
+      "scenario": "Basic",
+      "seed": 3,
+      "final_reward": 11.71,
+      "best_eval": 56.7,
+      "training_hours": 0.13184522026114995
+    },
+    {
+      "phase": "Phase1",
+      "method": "DeepSARSA",
+      "scenario": "Deathmatch",
+      "seed": 1,
+      "final_reward": 2.25,
+      "best_eval": 5.2,
+      "training_hours": 0.7459830494059456
+    },
+    {
+      "phase": "Phase1",
+      "method": "DeepSARSA",
+      "scenario": "Deathmatch",
+      "seed": 2,
+      "final_reward": 2.36,
+      "best_eval": 4.5,
+      "training_hours": 0.7378978251748615
+    },
+    {
+      "phase": "Phase1",
+      "method": "DeepSARSA",
+      "scenario": "Deathmatch",
+      "seed": 3,
+      "final_reward": 1.75,
+      "best_eval": 3.3,
+      "training_hours": 0.7378046919239892
+    },
+    {
+      "phase": "Phase1",
+      "method": "DeepSARSA",
+      "scenario": "TakeCover",
+      "seed": 1,
+      "final_reward": 788.71,
+      "best_eval": 1088.4,
+      "training_hours": 0.6101813469330469
+    },
+    {
+      "phase": "Phase1",
+      "method": "DeepSARSA",
+      "scenario": "TakeCover",
+      "seed": 2,
+      "final_reward": 817.07,
+      "best_eval": 1014.2,
+      "training_hours": 0.5865458642774158
+    },
+    {
+      "phase": "Phase1",
+      "method": "DeepSARSA",
+      "scenario": "TakeCover",
+      "seed": 3,
+      "final_reward": 744.96,
+      "best_eval": 1137.7,
+      "training_hours": 0.5834813150432375
+    },
+    {
+      "phase": "Phase2",
+      "method": "DQN_n3",
+      "scenario": "Basic",
+      "seed": 1,
+      "final_reward": -143.95,
+      "best_eval": -51.2,
+      "training_hours": 0.2269850653409958
+    },
+    {
+      "phase": "Phase2",
+      "method": "DQN_n3",
+      "scenario": "Basic",
+      "seed": 2,
+      "final_reward": -260.37,
+      "best_eval": -300.0,
+      "training_hours": 0.25367219070593516
+    },
+    {
+      "phase": "Phase2",
+      "method": "DQN_n3",
+      "scenario": "Deathmatch",
+      "seed": 1,
+      "final_reward": 3.21,
+      "best_eval": 7.0,
+      "training_hours": 0.727485609849294
+    },
+    {
+      "phase": "Phase2",
+      "method": "DQN_n3",
+      "scenario": "TakeCover",
+      "seed": 1,
+      "final_reward": 515.05,
+      "best_eval": 631.8,
+      "training_hours": 0.37838303327560424
+    },
+    {
+      "phase": "Phase2",
+      "method": "DQN_n3",
+      "scenario": "TakeCover",
+      "seed": 2,
+      "final_reward": 613.34,
+      "best_eval": 1009.9,
+      "training_hours": 0.42935621605979074
+    },
+    {
+      "phase": "Phase3a",
+      "method": "DQN_PER",
+      "scenario": "Basic",
+      "seed": 1,
+      "final_reward": 55.32,
+      "best_eval": 83.0,
+      "training_hours": 0.06992183870739407
+    },
+    {
+      "phase": "Phase3a",
+      "method": "DQN_PER",
+      "scenario": "Basic",
+      "seed": 2,
+      "final_reward": 74.91,
+      "best_eval": 78.3,
+      "training_hours": 0.090959110127555
+    },
+    {
+      "phase": "Phase3a",
+      "method": "DQN_PER",
+      "scenario": "TakeCover",
+      "seed": 1,
+      "final_reward": 869.37,
+      "best_eval": 1053.1,
+      "training_hours": 0.4987101894617081
+    },
+    {
+      "phase": "Phase3a",
+      "method": "DQN_PER",
+      "scenario": "TakeCover",
+      "seed": 2,
+      "final_reward": 856.66,
+      "best_eval": 1199.0,
+      "training_hours": 0.4871349769830704
+    },
+    {
+      "phase": "Phase3b",
+      "method": "DDQN",
+      "scenario": "Basic",
+      "seed": 1,
+      "final_reward": 67.3,
+      "best_eval": 79.4,
+      "training_hours": 0.09927270518408882
+    },
+    {
+      "phase": "Phase3b",
+      "method": "DDQN",
+      "scenario": "Basic",
+      "seed": 2,
+      "final_reward": 53.18,
+      "best_eval": 83.4,
+      "training_hours": 0.0960367845164405
+    },
+    {
+      "phase": "Phase3b",
+      "method": "DDQN",
+      "scenario": "TakeCover",
+      "seed": 1,
+      "final_reward": 900.73,
+      "best_eval": 970.3,
+      "training_hours": 0.5738516441980998
+    },
+    {
+      "phase": "Phase3b",
+      "method": "DDQN",
+      "scenario": "TakeCover",
+      "seed": 2,
+      "final_reward": 826.73,
+      "best_eval": 1072.7,
+      "training_hours": 0.5786267063352797
+    },
+    {
+      "phase": "Phase3c",
+      "method": "Dueling_DDQN",
+      "scenario": "Basic",
+      "seed": 1,
+      "final_reward": 69.88,
+      "best_eval": 82.3,
+      "training_hours": 0.07798974646462334
+    },
+    {
+      "phase": "Phase3c",
+      "method": "Dueling_DDQN",
+      "scenario": "Basic",
+      "seed": 2,
+      "final_reward": 60.42,
+      "best_eval": 76.6,
+      "training_hours": 0.11019124236371781
+    }
+  ]
+}
